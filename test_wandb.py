@@ -1,28 +1,31 @@
-# test_wandb.py
-import os
+import random
+
 import wandb
 
-print("--- Starting W&B Test Script ---")
+# Start a new wandb run to track this script.
+run = wandb.init(
+    # Set the wandb entity where your project will be logged (generally your team name).
+    entity="my-awesome-team-name",
+    # Set the wandb project where this run will be logged.
+    project="my-awesome-project",
+    # Track hyperparameters and run metadata.
+    config={
+        "learning_rate": 0.02,
+        "architecture": "CNN",
+        "dataset": "CIFAR-100",
+        "epochs": 10,
+    },
+)
 
-# 1. Check Environment Variable
-print("WANDB_API_KEY from environment:", os.environ.get("WANDB_API_KEY"))
+# Simulate training.
+epochs = 10
+offset = random.random() / 5
+for epoch in range(2, epochs):
+    acc = 1 - 2**-epoch - random.random() / epoch - offset
+    loss = 2**-epoch + random.random() / epoch + offset
 
-try:
-    # 2. Initialize wandb
-    wandb.init(project="test-wandb-connectivity")  # Simple project
+    # Log metrics to wandb.
+    run.log({"acc": acc, "loss": loss})
 
-    # 3. Log a basic value
-    wandb.log({"test_metric": 1.0})
-    print("Successfully logged a metric to W&B")
-
-    # 4. Finish the run
-    wandb.finish()
-    print("Successfully finished the W&B run")
-
-    print("--- W&B Test Passed (Basic) ---")
-
-except Exception as e:
-    print(f"--- W&B Test Failed: {e} ---")
-    print("Please check your W&B setup (login, API key, network).")
-
-print("--- Ending W&B Test Script ---")
+# Finish the run and upload any remaining data.
+run.finish()
