@@ -12,7 +12,19 @@ seq_dim = d + C + aux
 BATCH = 32
 EPOCHS = 3
 LR = 1e-3
-wandb.init(project="ic-ssl", name="cot_baseline", config=locals())
+# wandb.init(project="ic-ssl", name="cot_baseline", config=locals())
+
+wandb.init(
+    project="ic-ssl",
+    name="cot_baseline",
+    config=dict(
+        C=C, d=d, n=n, m=m, T=T, aux=aux,
+        d_model=256,      # or whatever you set in model.py
+        batch=BATCH,
+        epochs=EPOCHS,
+        lr=LR,
+    ),
+)
 
 # ---------------------------- sequence builder ---------------------------- #
 def build_sequence(x_lab, y_lab, x_unlab):
