@@ -4,27 +4,40 @@ from torch.utils.data import DataLoader
 from data import ICSSLDataset, sample_linear_task
 from model import ICSSLTransformer
 
-# ----------------------- hyper‑params & W&B setup -------------------------- #
-C, d, n, m = 3, 16, 4, 6          # task dimensions
-T = 3                              # CoT iterations
+# ----------------------- hyper-params & W&B setup -------------------------- #
+C, d, n, m = 3, 16, 4, 6         # task dimensions
+T = 3                         # CoT iterations
 aux = 0
 seq_dim = d + C + aux
 BATCH = 32
 EPOCHS = 3
 LR = 1e-3
-# wandb.init(project="ic-ssl", name="cot_baseline", config=locals())
 
-wandb.init(
-    project="ic-ssl",
-    name="cot_baseline",
-    config=dict(
-        C=C, d=d, n=n, m=m, T=T, aux=aux,
-        d_model=256,      # or whatever you set in model.py
-        batch=BATCH,
-        epochs=EPOCHS,
-        lr=LR,
-    ),
-)
+# Debugging W&B Authentication
+print("WANDB_API_KEY from environment:", os.environ.get("WANDB_API_KEY"))
+try:
+    import wandb
+    # wandb.init(project="ic-ssl", name="cot_baseline", config=locals())
+    wandb.init(
+        project="ic-ssl",
+        name="cot_baseline",
+        config=dict(
+            C=C, d=d, n=n, m=m, T=T, aux=aux,
+            d_model=256,      # or whatever you set in model.py
+            batch=BATCH,
+            epochs=EPOCHS,
+            lr=LR,
+        ),
+    )
+except ImportError as e:
+    print(f"wandb import error: {e}")
+    # Handle the case where wandb is not available (e.g., for local debugging)
+    class MockWandb:  # Create a dummy wandb class
+        def init(self, *args, **kwargs): pass
+        def log(self, *args, **kwargs): pass
+        def finish(self): pass
+    wandb = MockWandb()
+    wandb.init()  # Initialize the mock
 
 # ---------------------------- sequence builder ---------------------------- #
 def build_sequence(x_lab, y_lab, x_unlab):
@@ -37,10 +50,10 @@ def build_sequence(x_lab, y_lab, x_unlab):
     lab = torch.cat([x_lab, one_hot], dim=1)            # (C*n, d+C)
 
     unlab = torch.cat([x_unlab,
-                       torch.zeros(x_unlab.size(0), C)], dim=1)  # (C*m,d+C)
+                        torch.zeros(x_unlab.size(0), C)], dim=1)  # (C*m,d+C)
 
-    reasoning = torch.zeros(T * C, d + C)               # blank CoT blocks
-    seq = torch.cat([lab, unlab, reasoning], dim=0)     # (L, d+C)
+    reasoning = torch.zeros(T * C, d + C)              # blank CoT blocks
+    seq = torch.cat([lab, unlab, reasoning], dim=0)      # (L, d+C)
     return seq
 
 # ------------------------------- dataloaders ------------------------------ #
@@ -66,18 +79,18 @@ for epoch in range(EPOCHS):
         B = x_lab.size(0)
         # build initial sequences
         seq = torch.stack([build_sequence(x_lab[i], y_lab[i], x_unlab[i])
-                           for i in range(B)]).to(device)       # (B,L,D)
+                            for i in range(B)]).to(device)      # (B,L,D)
         # iterative CoT
         loss = 0.0
         for t in range(T):
-            out = model(seq)                                    # (B,L,D)
+            out = model(seq)                                  # (B,L,D)
             # predicted μ^(t): last C columns of current sequence
-            pred = out[:, -C:, :d]                              # (B,C,d)
-            target = em_targets[:, t]                           # (B,C,d)
+            pred = out[:, -C:, :d]                            # (B,C,d)
+            target = em_targets[:, t]                          # (B,C,d)
             loss += mse(pred, target)
 
-            # append the *raw* model output (not grad‑detached!) to form next seq
-            seq = torch.cat([seq, out[:, -C:, :]], dim=1)       # grow sequence
+            # append the *raw* model output (not grad-detached!) to form next seq
+            seq = torch.cat([seq, out[:, -C:, :]], dim=1)      # grow sequence
 
         opt.zero_grad()
         loss.backward()
@@ -87,6 +100,6 @@ for epoch in range(EPOCHS):
         global_step += 1
         wandb.log({"loss": loss.item(), "epoch": epoch}, step=global_step)
 
-    print(f"Epoch {epoch}  –  loss {loss.item():.4f}")
+    print(f"Epoch {epoch} - loss {loss.item():.4f}")
 
 wandb.finish()
