@@ -112,17 +112,20 @@ for epoch in range(args.epochs):
         if args.experiment == "cot":
             for t in range(args.T):
                 out = model(seq)                              # (B,L,exp_dim)
-                pred = out[:, -args.C:, :args.d]              # first d dims
+                pred = out[:, -args.C:, args.d:args.C+args.d]              # first d dims
                 loss += mse(pred, em_tgt[:, t])
                 seq  = torch.cat([seq, out[:, -args.C:, :]], dim=1)
         else:  # no_cot
             out = seq
             for _ in range(args.loops):
                 out = model(out)
-            unlab_feat = out[:, lab_len:lab_len+unlab_len, :args.d]
-            logits = readout(unlab_feat)
+            out_pred = out[:, :, args.d:args.C+args.d]
+            unlab_feat = out[:, lab_len:lab_len+unlab_len, args.d:args.C+args.d]
+            # logits = readout(unlab_feat)
+            logits = out_pred
+            labels = torch.cat( [y_lab, y_unlab],dim=1) 
             loss   = xent(logits.reshape(-1, args.C),
-                          y_unlab.reshape(-1))
+                          labels.reshape(-1))
 
         opt.zero_grad()
         loss.backward()
