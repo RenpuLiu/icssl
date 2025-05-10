@@ -5,12 +5,17 @@ from typing import List
 
 
 def sample_linear_task(C: int, d: int, n: int, m: int) -> dict:
-    """One IC‑SSL ‘instance’."""
+
     means = torch.randn(C, d)                        # true class means 𝑚_c
     x_lab = torch.cat([means[c] + torch.randn(n, d) for c in range(C)])
     y_lab = torch.repeat_interleave(torch.arange(C), n)
     x_unlab = torch.cat([means[c] + torch.randn(m, d) for c in range(C)])
-    return dict(means=means, x_lab=x_lab, y_lab=y_lab, x_unlab=x_unlab)
+    y_unlab = torch.repeat_interleave(torch.arange(C), m)
+
+    return dict(means=means,
+                x_lab=x_lab, y_lab=y_lab,
+                x_unlab=x_unlab, y_unlab=y_unlab)
+
 
 
 # ------------------------------- EM ORACLE --------------------------------- #
