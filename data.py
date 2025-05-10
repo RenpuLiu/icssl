@@ -7,9 +7,9 @@ from typing import List
 def sample_linear_task(C: int, d: int, n: int, m: int) -> dict:
 
     means = torch.randn(C, d)                        # true class means 𝑚_c
-    x_lab = torch.cat([means[c] + 0.1*torch.randn(n, d) for c in range(C)])
+    x_lab = torch.cat([means[c] + 0.5*torch.randn(n, d) for c in range(C)])
     y_lab = torch.repeat_interleave(torch.arange(C), n)
-    x_unlab = torch.cat([means[c] + 0.1*torch.randn(m, d) for c in range(C)])
+    x_unlab = torch.cat([means[c] + 0.5*torch.randn(m, d) for c in range(C)])
     y_unlab = torch.repeat_interleave(torch.arange(C), m)
 
     return dict(means=means,
