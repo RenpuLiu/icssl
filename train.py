@@ -29,7 +29,7 @@ except ImportError:
 
 # ──────────────────── 2. Hyper‑parameters ──────────────────────
 C, d, n, m = 3, 16, 4, 6          # task dimensions
-T             = 3                 # CoT iterations
+T             = 20                 # CoT iterations
 aux           = 0
 seq_dim       = d + C + aux
 BATCH         = 32
