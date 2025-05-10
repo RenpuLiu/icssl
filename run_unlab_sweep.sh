@@ -8,7 +8,7 @@
 C=3            # number of classes
 d=10           # feature dimension
 n=4            # labelled per class
-EPOCHS=20
+EPOCHS=10
 BATCH=32
 LR=1e-3
 DMODEL=256
@@ -22,7 +22,7 @@ for M in "${UNLAB_LIST[@]}"; do
   python train.py \
     --experiment  no_cot \
     --C $C --d $d --n $n --m $M \
-    --n_layers 12  --loops 1 \
+    --n_layers 3  --loops 1 \
     --d_model $DMODEL \
     --epochs $EPOCHS --batch $BATCH --lr $LR \
     --wandb_project $PROJECT \
