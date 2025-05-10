@@ -33,7 +33,7 @@ T             = 4                 # CoT iterations
 aux           = 0
 seq_dim       = d + C + aux
 BATCH         = 32
-EPOCHS        = 20
+EPOCHS        = 200
 LR            = 1e-3
 
 # ──────────────────── 3. Create / init run ─────────────────────
