@@ -8,14 +8,14 @@
 C=3            # number of classes
 d=3           # feature dimension
 n=2           # labelled per class
-EPOCHS=10
+EPOCHS=50
 BATCH=32
 LR=1e-3
 DMODEL=256
 PROJECT=ic-ssl    # W&B project
 
 # list of unlabeled counts to test
-UNLAB_LIST=(2 4 8 16 32)
+UNLAB_LIST=(0 32)
 
 # ===== 1.  Twelve‑layer Transformer  =====
 for M in "${UNLAB_LIST[@]}"; do
