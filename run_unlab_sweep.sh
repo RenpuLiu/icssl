@@ -6,16 +6,16 @@
 
 # ===== default task / model params =====
 C=3            # number of classes
-d=16           # feature dimension
+d=10           # feature dimension
 n=4            # labelled per class
-EPOCHS=5
+EPOCHS=20
 BATCH=32
 LR=1e-3
 DMODEL=256
 PROJECT=ic-ssl    # W&B project
 
 # list of unlabeled counts to test
-UNLAB_LIST=(2 4 6 8 10 12)
+UNLAB_LIST=(2 4 8 16 32)
 
 # ===== 1.  Twelve‑layer Transformer  =====
 for M in "${UNLAB_LIST[@]}"; do
