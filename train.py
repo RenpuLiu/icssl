@@ -46,13 +46,24 @@ wandb.init(
 
 # ──────────────────── 4. Helpers & data ────────────────────────
 def build_sequence(x_lab, y_lab, x_unlab):
-    """Pack labelled + unlabelled samples and blank CoT slots."""
+    """
+    Assemble (L, d+C) sequence:
+      • labelled points with one‑hot labels
+      • unlabelled points with zero label slots
+      • T·C blank rows reserved for CoT reasoning
+    """
+    device = x_lab.device
     one_hot = torch.zeros_like(y_lab[:, None].repeat(1, C), dtype=torch.float)
     one_hot[torch.arange(y_lab.size(0)), y_lab] = 1.0
-    lab     = torch.cat([x_lab, one_hot], dim=1)             # (C*n, d+C)
-    unlab   = torch.cat([x_unlab, torch.zeros(x_unlab.size(0), C)], dim=1)
-    reasoning = torch.zeros(T * C, d + C)
-    return torch.cat([lab, unlab, reasoning], dim=0)         # (L, d+C)
+    lab = torch.cat([x_lab, one_hot], dim=1)                           # (C·n, d+C)
+
+    unlab = torch.cat([x_unlab,
+                       torch.zeros(x_unlab.size(0), C, device=device)], dim=1)
+
+    reasoning = torch.zeros(T * C, d + C, device=device)              # blank CoT
+
+    return torch.cat([lab, unlab, reasoning], dim=0)                  # (L, d+C)
+
 
 ds = ICSSLDataset(C, d, n, m, T, size=2000)
 dl = DataLoader(ds, batch_size=BATCH, shuffle=True)
