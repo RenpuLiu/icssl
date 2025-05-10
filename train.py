@@ -1,105 +1,95 @@
 # icssl_expts/train.py
-import os, wandb, math, torch
+import os, math, torch
 from torch.utils.data import DataLoader
-from data import ICSSLDataset, sample_linear_task
-from model import ICSSLTransformer
+from data import ICSSLDataset, sample_linear_task   # unchanged
+from model import ICSSLTransformer                  # unchanged
 
-# ----------------------- hyper-params & W&B setup -------------------------- #
-C, d, n, m = 3, 16, 4, 6         # task dimensions
-T = 3                         # CoT iterations
-aux = 0
-seq_dim = d + C + aux
-BATCH = 32
-EPOCHS = 3
-LR = 1e-3
-
-# Debugging W&B Authentication
-print("WANDB_API_KEY from environment:", os.environ.get("WANDB_API_KEY"))
+# ──────────────────── 1. W&B set‑up ────────────────────────────
 try:
     import wandb
-    # wandb.init(project="ic-ssl", name="cot_baseline", config=locals())
-    wandb.init(
-        project="ic-ssl",
-        name="cot_baseline",
-        config=dict(
-            C=C, d=d, n=n, m=m, T=T, aux=aux,
-            d_model=256,      # or whatever you set in model.py
-            batch=BATCH,
-            epochs=EPOCHS,
-            lr=LR,
-        ),
-    )
-except ImportError as e:
-    print(f"wandb import error: {e}")
-    # Handle the case where wandb is not available (e.g., for local debugging)
-    class MockWandb:  # Create a dummy wandb class
-        def init(self, *args, **kwargs): pass
-        def log(self, *args, **kwargs): pass
+    # ❶ Try a silent login with an env‑key; if it’s absent → disable wandb
+    if os.getenv("WANDB_API_KEY"):
+        # relogin=True skips the interactive prompt even if creds already exist
+        wandb.login(key=os.environ["WANDB_API_KEY"], relogin=True)  # :contentReference[oaicite:0]{index=0}
+        WANDB_ENABLED = True
+    else:
+        os.environ["WANDB_MODE"] = "disabled"      # local, no network calls
+        WANDB_ENABLED = False
+        print("WANDB_API_KEY not found → running with WANDB_MODE=disabled "
+              "(metrics will be written to ./wandb/offline‑runs).")  # optional
+except ImportError:
+    # ❷ Fake a minimal wandb interface so the rest of the code stays unchanged
+    WANDB_ENABLED = False
+    class _Dummy:
+        def init(self, *a, **k): return self
+        def log(self, *a, **k): pass
         def finish(self): pass
-    wandb = MockWandb()
-    wandb.init()  # Initialize the mock
+    wandb = _Dummy()
+    print("wandb package not installed → tracking disabled.")
 
-# ---------------------------- sequence builder ---------------------------- #
+# ──────────────────── 2. Hyper‑parameters ──────────────────────
+C, d, n, m = 3, 16, 4, 6          # task dimensions
+T             = 3                 # CoT iterations
+aux           = 0
+seq_dim       = d + C + aux
+BATCH         = 32
+EPOCHS        = 3
+LR            = 1e-3
+
+# ──────────────────── 3. Create / init run ─────────────────────
+wandb.init(
+    project="ic-ssl",
+    name="cot_baseline",
+    config=dict(C=C, d=d, n=n, m=m, T=T, aux=aux,
+                d_model=256, batch=BATCH, epochs=EPOCHS, lr=LR)
+)
+
+# ──────────────────── 4. Helpers & data ────────────────────────
 def build_sequence(x_lab, y_lab, x_unlab):
-    """
-    Return (seq_len, feat_dim) tensor representing labelled + unlabelled,
-    plus *empty* reasoning slots (T*C cols) initialised to zeros.
-    """
+    """Pack labelled + unlabelled samples and blank CoT slots."""
     one_hot = torch.zeros_like(y_lab[:, None].repeat(1, C), dtype=torch.float)
     one_hot[torch.arange(y_lab.size(0)), y_lab] = 1.0
-    lab = torch.cat([x_lab, one_hot], dim=1)            # (C*n, d+C)
+    lab     = torch.cat([x_lab, one_hot], dim=1)             # (C*n, d+C)
+    unlab   = torch.cat([x_unlab, torch.zeros(x_unlab.size(0), C)], dim=1)
+    reasoning = torch.zeros(T * C, d + C)
+    return torch.cat([lab, unlab, reasoning], dim=0)         # (L, d+C)
 
-    unlab = torch.cat([x_unlab,
-                        torch.zeros(x_unlab.size(0), C)], dim=1)  # (C*m,d+C)
-
-    reasoning = torch.zeros(T * C, d + C)              # blank CoT blocks
-    seq = torch.cat([lab, unlab, reasoning], dim=0)      # (L, d+C)
-    return seq
-
-# ------------------------------- dataloaders ------------------------------ #
 ds = ICSSLDataset(C, d, n, m, T, size=2000)
 dl = DataLoader(ds, batch_size=BATCH, shuffle=True)
 
-# ------------------------------- model & opt ------------------------------ #
+# ──────────────────── 5. Model & optimiser ─────────────────────
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model = ICSSLTransformer(seq_dim).to(device)
-opt = torch.optim.AdamW(model.parameters(), lr=LR)
-mse = torch.nn.MSELoss()
+model  = ICSSLTransformer(seq_dim).to(device)
+opt    = torch.optim.AdamW(model.parameters(), lr=LR)
+mse    = torch.nn.MSELoss()
 
-# ----------------------------- training loop ------------------------------ #
+# ──────────────────── 6. Training loop ─────────────────────────
 global_step = 0
 for epoch in range(EPOCHS):
     for batch in dl:
-        # unpack & send to GPU
-        x_lab = batch["x_lab"].to(device)          # (B,C*n,d)
-        y_lab = batch["y_lab"].to(device)
-        x_unlab = batch["x_unlab"].to(device)
-        em_targets = batch["em_targets"].to(device)  # (B,T,C,d)
-
+        x_lab, y_lab   = batch["x_lab"].to(device), batch["y_lab"].to(device)
+        x_unlab        = batch["x_unlab"].to(device)
+        em_targets     = batch["em_targets"].to(device)
         B = x_lab.size(0)
-        # build initial sequences
+
         seq = torch.stack([build_sequence(x_lab[i], y_lab[i], x_unlab[i])
-                            for i in range(B)]).to(device)      # (B,L,D)
-        # iterative CoT
+                           for i in range(B)]).to(device)
+
         loss = 0.0
         for t in range(T):
-            out = model(seq)                                  # (B,L,D)
-            # predicted μ^(t): last C columns of current sequence
-            pred = out[:, -C:, :d]                            # (B,C,d)
-            target = em_targets[:, t]                          # (B,C,d)
-            loss += mse(pred, target)
-
-            # append the *raw* model output (not grad-detached!) to form next seq
-            seq = torch.cat([seq, out[:, -C:, :]], dim=1)      # grow sequence
+            out    = model(seq)                     # (B,L,D)
+            pred   = out[:, -C:, :d]                # (B,C,d)
+            target = em_targets[:, t]               # (B,C,d)
+            loss  += mse(pred, target)
+            seq    = torch.cat([seq, out[:, -C:, :]], dim=1)  # grow CoT
 
         opt.zero_grad()
         loss.backward()
         opt.step()
 
-        # logging
         global_step += 1
         wandb.log({"loss": loss.item(), "epoch": epoch}, step=global_step)
 
-    print(f"Epoch {epoch} - loss {loss.item():.4f}")
+    print(f"Epoch {epoch} – loss {loss.item():.4f}")
 
 wandb.finish()
