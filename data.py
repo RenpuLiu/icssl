@@ -67,5 +67,6 @@ class ICSSLDataset(Dataset):
         em_targets = em_means(self.C, self.d, self.n, self.m,
                               task["x_lab"], task["y_lab"],
                               task["x_unlab"], self.T)              # (T+1,C,d)
-        task["em_targets"] = torch.stack(em_targets[1:])            # discard step‑0
+        if self.T > 0:
+            task["em_targets"] = torch.stack(em_targets[1:])            # discard step‑0
         return task
