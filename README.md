@@ -14,6 +14,12 @@ git checkout -- run_unlab_sweep.sh
 git pull origin main                 
 
 ```
+
+```
+nohup ./run_ssl.sh > logs/ssl_$(date +%F_%H-%M-%S).log 2>&1 &
+echo "PID = $!"
+
+```
 ## Our code is based on Garg's work
 
 https://github.com/dtsip/in-context-learning
