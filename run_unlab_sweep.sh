@@ -15,7 +15,7 @@ DMODEL=256
 PROJECT=ic-ssl    # W&B project
 
 # list of unlabeled counts to test
-UNLAB_LIST=(0 2 4 6 8 12)
+UNLAB_LIST=(2 4 6 8 10 12)
 
 # ===== 1.  Twelve‑layer Transformer  =====
 for M in "${UNLAB_LIST[@]}"; do
